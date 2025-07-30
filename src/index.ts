@@ -23,15 +23,13 @@ const CLIENT_SECRET = process.env.CLIENT_SECRET!;
 const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:3000/linked-role';
 const PORT = process.env.PORT || 3000;
 
-// Configurable repositories to check (1 or 2 repositories)
-const REPO_1 = process.env.REPO_1!;
-const REPO_2 = process.env.REPO_2;
-
-// Build repositories array from environment variables
-const REPOSITORIES = [REPO_1, REPO_2].filter((repo): repo is string => repo != null && repo.trim() !== '');
+// Parse comma-separated repositories from environment variable
+const REPOSITORIES_ENV = process.env.REPOSITORIES || 'dotnet/aspire,communitytoolkit/aspire';
+const REPOSITORIES = REPOSITORIES_ENV.split(',').map(repo => repo.trim()).filter(repo => repo.length > 0);
 
 if (REPOSITORIES.length === 0) {
-  console.error('❌ Error: At least REPO_1 must be set in environment variables');
+  console.error('❌ Error: At least one repository must be specified in REPOSITORIES environment variable');
+  console.error('❌ Format: "owner/repo1,owner/repo2,owner/repo3"');
   process.exit(1);
 }
 
@@ -129,15 +127,20 @@ async function registerLinkedRole(): Promise<void> {
 
 app.get('/auth', (req: Request, res: Response) => {
   console.log(`🔍 Starting auth flow for repositories: ${REPOSITORIES.join(', ')}`);
+  console.log(`🔧 Using REDIRECT_URI: ${REDIRECT_URI}`);
   const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=role_connections.write%20identify%20connections`;
+  console.log(`🔗 Generated auth URL: ${authUrl}`);
   res.redirect(authUrl);
 });
 
 app.get('/linked-role', async (req: Request, res: Response) => {
   const { code } = req.query;
   console.log('🔗 Linked role callback triggered');
+  console.log(`🔧 Current REDIRECT_URI: ${REDIRECT_URI}`);
+  console.log(`📥 Received code: ${code ? 'present' : 'missing'}`);
   
   if (typeof code !== 'string') {
+    console.log('❌ Invalid or missing authorization code');
     return res.send('❌ Invalid authorization code.');
   }
   
@@ -154,9 +157,13 @@ app.get('/linked-role', async (req: Request, res: Response) => {
       }),
     });
     
+    console.log(`🔄 Token exchange response status: ${tokenResponse.status}`);
     const tokenData: DiscordTokenResponse = await tokenResponse.json();
+    console.log(`📋 Token response data:`, tokenData);
+    
     if (!tokenData.access_token) {
-      return res.send('❌ Failed to authenticate with Discord.');
+      console.error('❌ Failed to get access token. Full response:', tokenData);
+      return res.send(`❌ Failed to authenticate with Discord. Error: ${JSON.stringify(tokenData)}`);
     }
 
     const userResponse = await fetch('https://discord.com/api/v10/users/@me', {
@@ -190,6 +197,37 @@ app.get('/linked-role', async (req: Request, res: Response) => {
       }
     } else {
       console.log('❌ No verified GitHub connection found');
+      // Return early with instructions for connecting GitHub
+      return res.send(`
+        <html>
+          <head><title>Discord Linked Role - Connect GitHub</title></head>
+          <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px; max-width: 600px; margin: 0 auto;">
+            <h2>🔗 Connect Your GitHub Account</h2>
+            <p>To verify your contributions, you need to connect your GitHub account to Discord first.</p>
+            
+            <div style="background: #f6f8fa; padding: 20px; border-radius: 8px; margin: 20px 0; text-align: left;">
+              <h3>📋 Steps to Connect GitHub:</h3>
+              <ol style="line-height: 1.6;">
+                <li><strong>Open Discord Settings:</strong> Click the gear icon ⚙️ next to your username</li>
+                <li><strong>Go to Connections:</strong> Find "Connections" in the left sidebar</li>
+                <li><strong>Add GitHub:</strong> Click the GitHub icon and authorize the connection</li>
+                <li><strong>Make it Public:</strong> Toggle "Display on profile" to ON (required for verification)</li>
+                <li><strong>Try Again:</strong> Come back and use the verification link again</li>
+              </ol>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+              <strong>Note:</strong> Your GitHub connection must be public and verified for the bot to check your contributions.
+            </p>
+            
+            <p style="margin-top: 30px;">
+              <a href="/auth" style="background: #5865F2; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">
+                🔄 Try Verification Again
+              </a>
+            </p>
+          </body>
+        </html>
+      `);
     }
 
     const updateResponse = await fetch(`https://discord.com/api/v10/users/@me/applications/${CLIENT_ID}/role-connection`, {

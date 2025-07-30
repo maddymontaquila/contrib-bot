@@ -9,14 +9,11 @@ var cae = builder.AddAzureContainerAppEnvironment("contrib-bot-env");
 // Non-sensitive parameters from appsettings.json
 var redirectUri = builder.ExecutionContext.IsRunMode 
     ? builder.AddParameter("RedirectUri", "http://localhost:3000/linked-role")
-    : builder.AddParameter("RedirectUri")
+    : builder.AddParameter("RedirectUri", "https://orca-app-hi499.ondigitalocean.app/linked-role")
         .WithDescription(ParameterDescriptions.RedirectUri, enableMarkdown: true);
 
-var repo1 = builder.AddParameter("Repo1")
-    .WithDescription(ParameterDescriptions.Repo1, enableMarkdown: true);
-
-var repo2 = builder.AddParameter("Repo2")
-    .WithDescription(ParameterDescriptions.Repo2, enableMarkdown: true);
+var repositories = builder.AddParameter("Repositories")
+    .WithDescription(ParameterDescriptions.Repositories, enableMarkdown: true);
 
 // Sensitive parameters from user secrets
 var clientId = builder.AddParameter("ClientId", secret: true)
@@ -48,8 +45,7 @@ var discordBot = builder.AddNpmApp("contrib-verifier", "../")
     .WithEnvironment("DISCORD_TOKEN", discordToken)
     .WithEnvironment("GITHUB_TOKEN", githubToken)
     .WithEnvironment("REDIRECT_URI", redirectUri)
-    .WithEnvironment("REPO_1", repo1)
-    .WithEnvironment("REPO_2", repo2)
+    .WithEnvironment("REPOSITORIES", repositories)
     .WithEnvironment("GUILD_ID", guildId)
     .WithEnvironment("ROLE_ID", roleId)
     .WithEnvironment("PORT", "3000")
@@ -70,14 +66,10 @@ static class ParameterDescriptions
         📋 **Format**: `https://your-domain.com/linked-role`
         """;
 
-    public const string Repo1 = """
-        **Primary repository** to check for contributions (required)  
-        Format: `owner/repository-name` (e.g., `dotnet/aspire`)
-        """;
-
-    public const string Repo2 = """
-        **Secondary repository** to check for contributions (optional)  
-        Format: `owner/repository-name` or leave empty string `""` if not needed
+    public const string Repositories = """
+        **Repositories to check for contributions** (comma-separated list)  
+        Format: `owner/repo1,owner/repo2,owner/repo3` (e.g., `dotnet/aspire,communitytoolkit/aspire,dotnet/aspire-docs`)  
+        📋 **Note**: At least one repository is required. Use commas to separate multiple repositories.
         """;
 
     public const string ClientId = """
