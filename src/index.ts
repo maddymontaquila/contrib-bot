@@ -24,7 +24,7 @@ const REDIRECT_URI = process.env.REDIRECT_URI || 'http://localhost:3000/linked-r
 const PORT = process.env.PORT || 3000;
 
 // Parse comma-separated repositories from environment variable
-const REPOSITORIES_ENV = process.env.REPOSITORIES || 'dotnet/aspire,communitytoolkit/aspire';
+const REPOSITORIES_ENV = process.env.REPOSITORIES || 'dotnet/aspire,communitytoolkit/aspire,microsoft/aspire.dev';
 const REPOSITORIES = REPOSITORIES_ENV.split(',').map(repo => repo.trim()).filter(repo => repo.length > 0);
 
 if (REPOSITORIES.length === 0) {
