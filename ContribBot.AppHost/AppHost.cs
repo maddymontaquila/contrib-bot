@@ -36,9 +36,8 @@ var roleId = builder.AddParameter("RoleId")
 
 // Add the TypeScript Discord bot as an npm application using CommunityToolkit
 // This will automatically run npm install and use the start script from package.json
-var discordBot = builder.AddNpmApp("contrib-verifier", "../")
-    .WithNpmPackageInstallation()
-    .WithHttpEndpoint(targetPort: 3000, name: "webhook")
+var discordBot = builder.AddJavaScriptApp("contrib-verifier", "../")
+    .WithHttpEndpoint(port: 3000, env: "PORT")
     .WithExternalHttpEndpoints()
     .WithEnvironment("CLIENT_ID", clientId)
     .WithEnvironment("CLIENT_SECRET", clientSecret)
@@ -48,7 +47,6 @@ var discordBot = builder.AddNpmApp("contrib-verifier", "../")
     .WithEnvironment("REPOSITORIES", repositories)
     .WithEnvironment("GUILD_ID", guildId)
     .WithEnvironment("ROLE_ID", roleId)
-    .WithEnvironment("PORT", "3000")
     .PublishAsDockerFile()
     .PublishAsAzureContainerApp((infra, app) =>
     {

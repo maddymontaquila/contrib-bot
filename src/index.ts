@@ -49,41 +49,16 @@ async function checkContributionsToRepos(githubUsername: string, repositories: s
       const [owner, repoName] = repo.split('/');
       if (!owner || !repoName) continue;
       
-      let allCommits: any[] = [];
-      let page = 1;
-      let hasMore = true;
+      // Use server-side author filter — no need to paginate through all commits
+      const { data: commits } = await octokit.repos.listCommits({ 
+        owner, 
+        repo: repoName, 
+        author: githubUsername,
+        since: sixMonthsAgo.toISOString(),
+        per_page: 1
+      });
       
-      while (hasMore) {
-        try {
-          const { data: commits } = await octokit.repos.listCommits({ 
-            owner, 
-            repo: repoName, 
-            since: sixMonthsAgo.toISOString(),
-            per_page: 100,
-            page 
-          });
-          
-          if (commits.length === 0) {
-            hasMore = false;
-          } else {
-            allCommits.push(...commits);
-            page++;
-            if (commits.length < 100 || page > 20) {
-              hasMore = false;
-            }
-          }
-        } catch (error) {
-          hasMore = false;
-        }
-      }
-      
-      // Check if user has contributed to this repository
-      const hasContributedToThis = allCommits.some(commit => 
-        commit.author?.login?.toLowerCase() === githubUsername.toLowerCase() ||
-        commit.committer?.login?.toLowerCase() === githubUsername.toLowerCase()
-      );
-      
-      if (hasContributedToThis) {
+      if (commits.length > 0) {
         return { hasContributed: true, contributedRepo: repo };
       }
       
