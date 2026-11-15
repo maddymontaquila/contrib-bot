@@ -29,8 +29,11 @@ var clientSecret = builder.AddParameter("ClientSecret", secret: true)
 var discordToken = builder.AddParameter("DiscordToken", secret: true)
     .WithDescription(ParameterDescriptions.DiscordToken, enableMarkdown: true);
 
-var githubToken = builder.AddParameter("GithubToken", secret: true)
-    .WithDescription(ParameterDescriptions.GithubToken, enableMarkdown: true);
+var githubClientId = builder.AddParameter("GithubClientId", secret: true)
+    .WithDescription(ParameterDescriptions.GithubClientId, enableMarkdown: true);
+
+var githubClientSecret = builder.AddParameter("GithubClientSecret", secret: true)
+    .WithDescription(ParameterDescriptions.GithubClientSecret, enableMarkdown: true);
 
 builder.AddJavaScriptApp("contrib-verifier", ".")
     .WithNpm(installCommand: "ci")
@@ -39,7 +42,8 @@ builder.AddJavaScriptApp("contrib-verifier", ".")
     .WithEnvironment("CLIENT_ID", clientId)
     .WithEnvironment("CLIENT_SECRET", clientSecret)
     .WithEnvironment("DISCORD_TOKEN", discordToken)
-    .WithEnvironment("GITHUB_TOKEN", githubToken)
+    .WithEnvironment("GITHUB_CLIENT_ID", githubClientId)
+    .WithEnvironment("GITHUB_CLIENT_SECRET", githubClientSecret)
     .WithEnvironment("REDIRECT_URI", redirectUri)
     .WithEnvironment("REPOSITORIES", repositories)
     .PublishAsDockerFile()
@@ -88,14 +92,19 @@ static class ParameterDescriptions
         ⚠️ **Note**: Token is only shown once, save it immediately
         """;
 
-    public const string GithubToken = """
-        **GitHub Personal Access Token**  
-        1. Go to [GitHub Settings → Personal Access Tokens](https://github.com/settings/personal-access-tokens/tokens)  
-        2. Click **Generate new token** → **Fine-grained personal access token**  
-        3. Set expiration and select **Public Repositories (read)**  
-        4. Under **Repository permissions**, grant **Contents: Read**  
-        5. Click **Generate token** and copy the token  
-        📋 **Required permissions**: Contents (read) for public repositories
+    public const string GithubClientId = """
+        **GitHub OAuth App Client ID**
+        1. Go to [GitHub Settings > Developer settings > OAuth Apps](https://github.com/settings/developers)
+        2. Register or select an OAuth App (not a GitHub App)
+        3. Copy its **Client ID**
+        Used with the client secret to read public repository commits, without user authorization.
+        """;
+
+    public const string GithubClientSecret = """
+        **GitHub OAuth App Client Secret**
+        1. Select the same OAuth App in [GitHub Developer settings](https://github.com/settings/developers)
+        2. Click **Generate a new client secret** and copy it
+        Keep this secret server-side. It is separate from the Discord client secret.
         """;
 
 }

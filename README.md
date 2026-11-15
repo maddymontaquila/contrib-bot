@@ -15,7 +15,7 @@ Default repositories:
 
 - Node.js **24 LTS**, npm, and the .NET **10 SDK**.
 - Stable Aspire CLI **13.6.5** (matching the pinned AppHost SDK/integrations).
-- For real verification: a Discord application and a GitHub token with **Contents: read** access to the repositories being checked. For public repositories, select public-repository access when creating a fine-grained token.
+- For real verification: a Discord application and a GitHub **OAuth App** client ID and client secret for checking public repositories. No personal access token is required.
 - No database or background worker is required.
 
 ## Try locally without credentials
@@ -56,6 +56,10 @@ For a remotely accessible web app, use its HTTPS origin for both URLs and update
 
 ## Run the real bot with Aspire
 
+Register or select an **OAuth App** under GitHub Settings > Developer settings > OAuth Apps (not a GitHub App), then copy its client ID and generate a client secret. When registering, use your site's origin as the homepage URL and a URL on that origin as the required authorization callback URL. This bot never invokes a GitHub authorization flow or callback; users only authorize Discord.
+
+The server sends the GitHub credentials using [HTTP Basic authentication for public REST data](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-oauth-apps). These credentials cannot read private repositories. The normal limit is 5,000 requests per hour per OAuth App. Keep the secret server-side; no credentials appear in the landing page or request URLs.
+
 The AppHost is the single root `apphost.cs`, with pinned `#:sdk` and `#:package` directives; there is no `.csproj`. `aspire.config.json` selects it. Non-sensitive defaults are in root `appsettings.json`. `Parameters:Repositories` accepts a comma-separated list of `owner/repository` names. `Parameters:RedirectUri` defaults to `http://localhost:3000/linked-role`. Guild/role IDs are not needed: Discord manages role assignment.
 
 From the repository root:
@@ -64,14 +68,15 @@ From the repository root:
 aspire run
 ```
 
-Aspire prompts for unresolved parameters in the CLI or dashboard. Enter the four values below and select **Save to user secret** in the dashboard if you want Aspire to remember them locally. All four are declared with `secret: true` in `apphost.cs`; do not add them to `appsettings.json`.
+Aspire prompts for unresolved parameters in the CLI or dashboard. Enter the five values below and select **Save to user secret** in the dashboard if you want Aspire to remember them locally. All five are declared with `secret: true` in `apphost.cs`; do not add them to `appsettings.json`.
 
 | Secret key | Value |
 | --- | --- |
 | `Parameters:ClientId` | Discord application ID |
 | `Parameters:ClientSecret` | Discord OAuth2 client secret |
 | `Parameters:DiscordToken` | Discord bot token |
-| `Parameters:GithubToken` | GitHub read token |
+| `Parameters:GithubClientId` | GitHub OAuth App client ID |
+| `Parameters:GithubClientSecret` | GitHub OAuth App client secret |
 
 Alternatively, Aspire 13.6.5 supports these explicit secret commands:
 
@@ -79,7 +84,8 @@ Alternatively, Aspire 13.6.5 supports these explicit secret commands:
 aspire secret set Parameters:ClientId "<discord-application-id>" --apphost apphost.cs
 aspire secret set Parameters:ClientSecret "<discord-client-secret>" --apphost apphost.cs
 aspire secret set Parameters:DiscordToken "<discord-bot-token>" --apphost apphost.cs
-aspire secret set Parameters:GithubToken "<github-read-token>" --apphost apphost.cs
+aspire secret set Parameters:GithubClientId "<github-oauth-app-client-id>" --apphost apphost.cs
+aspire secret set Parameters:GithubClientSecret "<github-oauth-app-client-secret>" --apphost apphost.cs
 aspire run
 ```
 
@@ -106,6 +112,15 @@ Tests use mocked Discord/GitHub responses. They do not update live roles. CI run
 
 ## Optional container
 
-The Dockerfile builds on Node 24, and runs as the non-root `node` user. Set the web environment variables `CLIENT_ID`, `CLIENT_SECRET`, `DISCORD_TOKEN`, `GITHUB_TOKEN`, `REDIRECT_URI`, and `REPOSITORIES`. The container runs the real bot, not the preview, and excludes preview code. It is stateless; no volume is required. Container deployment is not provisioned by this refresh.
+The Dockerfile builds on Node 24, and runs as the non-root `node` user. Set the web environment variables `CLIENT_ID`, `CLIENT_SECRET`, `DISCORD_TOKEN`, `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `REDIRECT_URI`, and `REPOSITORIES`. The container runs the real bot, not the preview, and excludes preview code. It is stateless; no volume is required. Container deployment is not provisioned by this refresh.
+
+For an existing DigitalOcean App Platform deployment, add these runtime environment variables:
+
+| Variable | Value |
+| --- | --- |
+| `GITHUB_CLIENT_ID` | GitHub OAuth App client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth App client secret; mark it encrypted |
+
+Remove the old runtime `GITHUB_TOKEN`. Leave `CLIENT_ID`, `CLIENT_SECRET`, and `DISCORD_TOKEN` unchanged: they belong to Discord. Keep the existing `REDIRECT_URI` (the public HTTPS `/linked-role` URL registered in Discord), `REPOSITORIES`, and `PORT`. Set the new credentials before starting the updated image; startup fails if either is missing. Do not remove GitHub Actions' built-in `secrets.GITHUB_TOKEN`, which is still used to publish the image to GHCR.
 
 The UI uses the [official Aspire icon and palette](https://microsoft.github.io/aspire-brand/) (CC0 artwork) and locally served Poppins (OFL). Fonts and branding require no third-party requests.

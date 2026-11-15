@@ -11,7 +11,7 @@ try {
   console.log(`OAuth redirect URI: ${config.redirectUri}`);
   const discord = new DiscordApi(config);
   await discord.registerMetadata();
-  const server = createApp(config, discord, contributionChecker(config.githubToken)).listen(config.port, '0.0.0.0', () => {
+  const server = createApp(config, discord, contributionChecker(config)).listen(config.port, '0.0.0.0', () => {
     console.log(`Contributor verification listening on port ${config.port}.`);
   });
   server.on('error', () => {

@@ -9,7 +9,8 @@ import { createPreviewApp } from './preview-app.js';
 import { verify } from './verification.js';
 
 const config = loadConfig({
-  CLIENT_ID: 'test-client', CLIENT_SECRET: 'test-secret', DISCORD_TOKEN: 'test-bot', GITHUB_TOKEN: 'test-github',
+  CLIENT_ID: 'test-client', CLIENT_SECRET: 'test-secret', DISCORD_TOKEN: 'test-bot',
+  GITHUB_CLIENT_ID: 'test-github-client', GITHUB_CLIENT_SECRET: 'test-github-secret',
   REPOSITORIES: 'owner/repo',
 });
 
@@ -36,12 +37,29 @@ function mockDiscord(overrides: Partial<{
 const contributed: ContributionCheck = async () => ({ hasContributed: true, contributedRepo: 'owner/repo' });
 
 test('configuration defaults to the current Aspire repositories and rejects bad input', () => {
-  assert.deepEqual(loadConfig({ CLIENT_ID: '1', CLIENT_SECRET: '2', DISCORD_TOKEN: '3', GITHUB_TOKEN: '4' }).repositories,
+  assert.deepEqual(loadConfig({
+    CLIENT_ID: '1', CLIENT_SECRET: '2', DISCORD_TOKEN: '3', GITHUB_CLIENT_ID: '4', GITHUB_CLIENT_SECRET: '5',
+  }).repositories,
     ['microsoft/aspire', 'CommunityToolkit/Aspire', 'microsoft/aspire.dev', 'microsoft/aspire-samples']);
   assert.throws(() => loadConfig({}), /Missing required configuration/);
   assert.throws(() => loadConfig({
-    CLIENT_ID: '1', CLIENT_SECRET: '2', DISCORD_TOKEN: '3', GITHUB_TOKEN: '4', REPOSITORIES: 'not-a-repository',
+    CLIENT_ID: '1', CLIENT_SECRET: '2', DISCORD_TOKEN: '3', GITHUB_CLIENT_ID: '4', GITHUB_CLIENT_SECRET: '5',
+    REPOSITORIES: 'not-a-repository',
   }), /REPOSITORIES/);
+});
+
+test('GitHub OAuth App credentials are required separately from Discord credentials and a legacy PAT', () => {
+  const env = {
+    CLIENT_ID: 'discord-client', CLIENT_SECRET: 'discord-secret', DISCORD_TOKEN: 'discord-bot',
+    GITHUB_TOKEN: 'legacy-pat', GITHUB_CLIENT_ID: ' github-client ', GITHUB_CLIENT_SECRET: ' github-secret ',
+  };
+  const loaded = loadConfig(env);
+  assert.equal(loaded.githubClientId, 'github-client');
+  assert.equal(loaded.githubClientSecret, 'github-secret');
+  assert.equal(loaded.clientId, 'discord-client');
+  assert.equal(loaded.clientSecret, 'discord-secret');
+  assert.throws(() => loadConfig({ ...env, GITHUB_CLIENT_ID: '' }), /Missing required configuration: GITHUB_CLIENT_ID$/);
+  assert.throws(() => loadConfig({ ...env, GITHUB_CLIENT_SECRET: ' ' }), /Missing required configuration: GITHUB_CLIENT_SECRET$/);
 });
 
 test('verification sends Discord integer metadata as a string for both outcomes', async () => {
@@ -83,15 +101,27 @@ test('provider errors carry the failing step and error code for logs, not creden
   });
   const role = verify(mockDiscord({ role: () => json({ message: 'Missing Access', code: 50001 }, 403) }), contributed, config.repositories, 'access');
   await assert.rejects(role, (error: ProviderError) => /role-connection update: HTTP 403, code=50001, message=Missing Access/.test(error.detail!));
-  const github = contributionChecker('test', async () => json({ message: 'Bad credentials' }, 401))('user', ['owner/repo']);
-  await assert.rejects(github, (error: ProviderError) => /owner\/repo: 401, Bad credentials/.test(error.detail!));
+  const github = contributionChecker(config, async () => json({ message: 'Bad credentials' }, 401))('user', ['owner/repo']);
+  await assert.rejects(github, (error: ProviderError) => {
+    assert.match(error.detail!, /owner\/repo: 401, Bad credentials/);
+    assert.doesNotMatch(`${error.message} ${error.detail}`, /test-github-client|test-github-secret|Basic/);
+    assert.ok(!`${error.message} ${error.detail}`.includes(
+      Buffer.from(`${config.githubClientId}:${config.githubClientSecret}`).toString('base64')));
+    return true;
+  });
 });
 
 test('GitHub checker finds any past commit by the author in any repository', async () => {
   const urls: URL[] = [];
-  const check = contributionChecker('test', async input => {
+  const check = contributionChecker(config, async (input, init) => {
     const url = new URL(String(input));
     urls.push(url);
+    assert.equal(new Headers(init?.headers).get('authorization'),
+      `Basic ${Buffer.from(`${config.githubClientId}:${config.githubClientSecret}`).toString('base64')}`);
+    assert.equal(url.username, '');
+    assert.equal(url.password, '');
+    assert.equal(url.searchParams.has('client_id'), false);
+    assert.equal(url.searchParams.has('client_secret'), false);
     return url.pathname.includes('/empty/') ? json([]) : json([{ sha: 'commit' }]);
   });
   assert.deepEqual(await check('contributor', ['empty/repo', 'owner/repo']), { hasContributed: true, contributedRepo: 'owner/repo' });
@@ -103,10 +133,10 @@ test('GitHub checker finds any past commit by the author in any repository', asy
 
 test('GitHub rate limits/permissions/network errors are not negative contribution results', async () => {
   for (const status of [403, 404, 429, 500]) {
-    const check = contributionChecker('test', async () => json({ message: 'unavailable' }, status));
+    const check = contributionChecker(config, async () => json({ message: 'unavailable' }, status));
     await assert.rejects(check('user', ['owner/repo']), /Eligibility was not changed/);
   }
-  const check = contributionChecker('test', async () => { throw new TypeError('network failure'); });
+  const check = contributionChecker(config, async () => { throw new TypeError('network failure'); });
   await assert.rejects(check('user', ['owner/repo']), /Eligibility was not changed/);
 });
 

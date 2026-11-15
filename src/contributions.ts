@@ -1,11 +1,16 @@
 import { Octokit } from '@octokit/rest';
+import type { Config } from './config.js';
 import { ProviderError } from './discord.js';
 import type { ContributionResult } from './types.js';
 
 export type ContributionCheck = (username: string, repositories: string[]) => Promise<ContributionResult>;
 
-export function contributionChecker(token: string, request: typeof fetch = fetch): ContributionCheck {
-  const octokit = new Octokit({ auth: token, request: { timeout: 15_000, fetch: request }, log: {
+export function contributionChecker(
+  credentials: Pick<Config, 'githubClientId' | 'githubClientSecret'>,
+  request: typeof fetch = fetch,
+): ContributionCheck {
+  const authorization = `Basic ${Buffer.from(`${credentials.githubClientId}:${credentials.githubClientSecret}`).toString('base64')}`;
+  const octokit = new Octokit({ request: { timeout: 15_000, fetch: request }, log: {
     debug: () => {}, info: () => {}, warn: () => {}, error: () => {},
   } });
   return async (username, repositories) => {
@@ -15,7 +20,7 @@ export function contributionChecker(token: string, request: typeof fetch = fetch
       const [owner, repo] = repository.split('/');
       try {
         const { data } = await octokit.repos.listCommits({
-          owner, repo, author: username, per_page: 1,
+          owner, repo, author: username, per_page: 1, headers: { authorization },
         });
         if (data.length) return { hasContributed: true, contributedRepo: repository };
       } catch (error) {

@@ -6,7 +6,8 @@ import { page } from './pages.js';
 export function createPreviewApp(port = 3000) {
   const config = loadConfig({
     CLIENT_ID: 'preview-client', CLIENT_SECRET: 'preview-secret',
-    DISCORD_TOKEN: 'preview-bot', GITHUB_TOKEN: 'preview-github',
+    DISCORD_TOKEN: 'preview-bot',
+    GITHUB_CLIENT_ID: 'preview-github-client', GITHUB_CLIENT_SECRET: 'preview-github-secret',
     PORT: String(port),
   });
   const outcomes = ['success', 'empty', 'unlinked', 'error'];

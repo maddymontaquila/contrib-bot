@@ -2,14 +2,15 @@ export interface Config {
   clientId: string;
   clientSecret: string;
   discordToken: string;
-  githubToken: string;
+  githubClientId: string;
+  githubClientSecret: string;
   redirectUri: string;
   repositories: string[];
   port: number;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const required = ['CLIENT_ID', 'CLIENT_SECRET', 'DISCORD_TOKEN', 'GITHUB_TOKEN'];
+  const required = ['CLIENT_ID', 'CLIENT_SECRET', 'DISCORD_TOKEN', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET'];
   const missing = required.filter(key => !env[key]?.trim());
   if (missing.length) throw new Error(`Missing required configuration: ${missing.join(', ')}`);
 
@@ -28,7 +29,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     clientId: env.CLIENT_ID!.trim(),
     clientSecret: env.CLIENT_SECRET!.trim(),
     discordToken: env.DISCORD_TOKEN!.trim(),
-    githubToken: env.GITHUB_TOKEN!.trim(),
+    githubClientId: env.GITHUB_CLIENT_ID!.trim(),
+    githubClientSecret: env.GITHUB_CLIENT_SECRET!.trim(),
     redirectUri,
     repositories,
     port,
