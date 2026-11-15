@@ -61,8 +61,12 @@ export function createApp(config: Config, discord: DiscordApi, checkContribution
         : render('No Contributions', `<h1>No matching commits yet.</h1>
             <p>Check the GitHub account connected in Discord, or try after contributing.</p>${retry}`));
     } catch (error) {
-      const status = error instanceof ReauthorizationError ? 401 : error instanceof ProviderError ? 502 : 500;
-      console.error(`Verification failed (${status}).`);
+      // 503 rather than 502: DigitalOcean replaces 502 bodies with a generic page, hiding the retry message.
+      const status = error instanceof ReauthorizationError ? 401 : error instanceof ProviderError ? 503 : 500;
+      const detail = error instanceof ProviderError ? error.detail ?? error.message
+        : error instanceof ReauthorizationError ? 'Discord rejected the authorization (invalid_grant or 401)'
+        : error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : 'unknown error';
+      console.error(`Verification failed (${status}). ${detail}`);
       const message = status === 500 ? 'Verification failed. Please retry later.'
         : error instanceof Error ? error.message : 'Verification failed.';
       res.status(status).send(render('Verification unavailable',

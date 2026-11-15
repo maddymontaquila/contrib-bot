@@ -10,6 +10,7 @@ export function contributionChecker(token: string, request: typeof fetch = fetch
   } });
   return async (username, repositories) => {
     const failed: string[] = [];
+    const details: string[] = [];
     for (const repository of repositories) {
       const [owner, repo] = repository.split('/');
       try {
@@ -20,9 +21,12 @@ export function contributionChecker(token: string, request: typeof fetch = fetch
       } catch (error) {
         const status = typeof error === 'object' && error !== null && 'status' in error ? error.status : 'network error';
         failed.push(`${repository} (${status})`);
+        const reason = error instanceof Error ? error.message.split('\n')[0].slice(0, 200) : 'unknown error';
+        details.push(`${repository}: ${status}, ${reason}`);
       }
     }
-    if (failed.length) throw new ProviderError(`Could not check GitHub repositories: ${failed.join(', ')}. Eligibility was not changed.`);
+    if (failed.length) throw new ProviderError(`Could not check GitHub repositories: ${failed.join(', ')}. Eligibility was not changed.`,
+      `GitHub commit lookup: ${details.join('; ')}`);
     return { hasContributed: false, contributedRepo: null };
   };
 }

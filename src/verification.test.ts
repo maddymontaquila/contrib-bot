@@ -74,6 +74,19 @@ test('provider failures and malformed responses never change the role', async ()
   await assert.rejects(mockDiscord({ token: () => json({ error: 'invalid_grant' }, 400) }).exchangeCode('code'), ReauthorizationError);
 });
 
+test('provider errors carry the failing step and error code for logs, not credentials', async () => {
+  const exchange = mockDiscord({ token: () => json({ error: 'invalid_client', error_description: 'Invalid client' }, 401) }).exchangeCode('secret-code');
+  await assert.rejects(exchange, (error: ProviderError) => {
+    assert.match(error.detail!, /Discord token exchange: HTTP 401, error=invalid_client, error_description=Invalid client/);
+    assert.doesNotMatch(error.detail!, /secret-code|test-secret/);
+    return true;
+  });
+  const role = verify(mockDiscord({ role: () => json({ message: 'Missing Access', code: 50001 }, 403) }), contributed, config.repositories, 'access');
+  await assert.rejects(role, (error: ProviderError) => /role-connection update: HTTP 403, code=50001, message=Missing Access/.test(error.detail!));
+  const github = contributionChecker('test', async () => json({ message: 'Bad credentials' }, 401))('user', ['owner/repo']);
+  await assert.rejects(github, (error: ProviderError) => /owner\/repo: 401, Bad credentials/.test(error.detail!));
+});
+
 test('GitHub checker finds any past commit by the author in any repository', async () => {
   const urls: URL[] = [];
   const check = contributionChecker('test', async input => {
@@ -166,7 +179,7 @@ test('credential-free preview completes every outcome with browser-bound, one-us
     ['success', 200, /You're verified/],
     ['empty', 200, /No matching commits yet/],
     ['unlinked', 200, /Connect your GitHub account/],
-    ['error', 502, /Simulated GitHub outage/],
+    ['error', 503, /Simulated GitHub outage/],
   ] as const) {
     const start = await fetch(`${origin}/auth`, { redirect: 'manual' });
     const authorization = new URL(start.headers.get('location')!, origin);

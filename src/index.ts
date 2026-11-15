@@ -5,6 +5,10 @@ import { DiscordApi } from './discord.js';
 
 try {
   const config = loadConfig();
+  if (process.env.NODE_ENV === 'production' && ['localhost', '127.0.0.1'].includes(new URL(config.redirectUri).hostname)) {
+    console.warn(`REDIRECT_URI is ${config.redirectUri}; set it to the public https://<host>/linked-role URL registered in Discord.`);
+  }
+  console.log(`OAuth redirect URI: ${config.redirectUri}`);
   const discord = new DiscordApi(config);
   await discord.registerMetadata();
   const server = createApp(config, discord, contributionChecker(config.githubToken)).listen(config.port, '0.0.0.0', () => {
