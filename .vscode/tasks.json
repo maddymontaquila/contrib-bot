@@ -2,9 +2,9 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Run Discord Bot",
+			"label": "Preview verification (no credentials)",
 			"type": "shell",
-			"command": "node index.js",
+			"command": "npm run preview",
 			"group": {
 				"kind": "build",
 				"isDefault": true
@@ -14,7 +14,7 @@
 		{
 			"label": "Run with Aspire",
 			"type": "shell",
-			"command": "aspire run",
+			"command": "aspire run --apphost apphost.cs",
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"

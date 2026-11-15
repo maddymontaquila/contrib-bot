@@ -1,21 +1,25 @@
+#:sdk Aspire.AppHost.Sdk@13.6.5
+#:package Aspire.Hosting.Azure.AppContainers@13.6.5
+#:package Aspire.Hosting.JavaScript@13.6.5
+#:property AspireUseCliBundle=true
+#:property PublishAot=false
+
 using Aspire.Hosting;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Add Azure Container App Environment for cloud deployment
-var cae = builder.AddAzureContainerAppEnvironment("contrib-bot-env");
+builder.AddAzureContainerAppEnvironment("contrib-bot-env");
 
 // Add parameters for Discord bot configuration
 // Non-sensitive parameters from appsettings.json
-var redirectUri = builder.ExecutionContext.IsRunMode 
-    ? builder.AddParameter("RedirectUri", "http://localhost:3000/linked-role")
-    : builder.AddParameter("RedirectUri", "https://orca-app-hi499.ondigitalocean.app/linked-role")
-        .WithDescription(ParameterDescriptions.RedirectUri, enableMarkdown: true);
+var redirectUri = builder.AddParameter("RedirectUri")
+    .WithDescription(ParameterDescriptions.RedirectUri, enableMarkdown: true);
 
 var repositories = builder.AddParameter("Repositories")
     .WithDescription(ParameterDescriptions.Repositories, enableMarkdown: true);
 
-// Sensitive parameters from user secrets
+// Aspire prompts for unresolved secrets and passes them to the bot.
 var clientId = builder.AddParameter("ClientId", secret: true)
     .WithDescription(ParameterDescriptions.ClientId, enableMarkdown: true);
 
@@ -28,15 +32,8 @@ var discordToken = builder.AddParameter("DiscordToken", secret: true)
 var githubToken = builder.AddParameter("GithubToken", secret: true)
     .WithDescription(ParameterDescriptions.GithubToken, enableMarkdown: true);
 
-var guildId = builder.AddParameter("GuildId")
-    .WithDescription(ParameterDescriptions.GuildId, enableMarkdown: true);
-
-var roleId = builder.AddParameter("RoleId")
-    .WithDescription(ParameterDescriptions.RoleId, enableMarkdown: true);
-
-// Add the TypeScript Discord bot as an npm application using CommunityToolkit
-// This will automatically run npm install and use the start script from package.json
-var discordBot = builder.AddJavaScriptApp("contrib-verifier", "../")
+builder.AddJavaScriptApp("contrib-verifier", ".")
+    .WithNpm(installCommand: "ci")
     .WithHttpEndpoint(port: 3000, env: "PORT")
     .WithExternalHttpEndpoints()
     .WithEnvironment("CLIENT_ID", clientId)
@@ -45,14 +42,8 @@ var discordBot = builder.AddJavaScriptApp("contrib-verifier", "../")
     .WithEnvironment("GITHUB_TOKEN", githubToken)
     .WithEnvironment("REDIRECT_URI", redirectUri)
     .WithEnvironment("REPOSITORIES", repositories)
-    .WithEnvironment("GUILD_ID", guildId)
-    .WithEnvironment("ROLE_ID", roleId)
     .PublishAsDockerFile()
-    .PublishAsAzureContainerApp((infra, app) =>
-    {
-        // Configure additional container app settings if needed
-        // The app will automatically be deployed to the Azure Container App Environment
-    });
+    .PublishAsAzureContainerApp((infra, app) => { });
 
 builder.Build().Run();
 
@@ -66,7 +57,7 @@ static class ParameterDescriptions
 
     public const string Repositories = """
         **Repositories to check for contributions** (comma-separated list)  
-        Format: `owner/repo1,owner/repo2,owner/repo3` (e.g., `dotnet/aspire,communitytoolkit/aspire,dotnet/aspire-docs,microsoft/aspire.dev`)  
+        Format: `owner/repo1,owner/repo2,owner/repo3` (e.g., `microsoft/aspire,CommunityToolkit/Aspire,microsoft/aspire.dev,microsoft/aspire-samples`)
         📋 **Note**: At least one repository is required. Use commas to separate multiple repositories.
         """;
 
@@ -107,20 +98,4 @@ static class ParameterDescriptions
         📋 **Required permissions**: Contents (read) for public repositories
         """;
 
-    public const string GuildId = """
-        **Discord Server (Guild) ID**  
-        1. Enable **Developer Mode** in Discord (User Settings → Advanced → Developer Mode)  
-        2. Right-click on your Discord server name  
-        3. Click **Copy Server ID**  
-        📋 **Format**: 18-19 digit number (e.g., `1361488941836140614`)
-        """;
-
-    public const string RoleId = """
-        **Discord Role ID** for linked role assignment  
-        1. Enable **Developer Mode** in Discord (User Settings → Advanced → Developer Mode)  
-        2. Go to your Discord server → Server Settings → Roles  
-        3. Right-click on the role you want to assign  
-        4. Click **Copy Role ID**  
-        📋 **Format**: 18-19 digit number (e.g., `1399874023743291482`)
-        """;
 }

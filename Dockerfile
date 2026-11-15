@@ -1,30 +1,19 @@
-# Use the official Node.js 20 Alpine image
-FROM node:20-alpine
-
-# Set working directory
+FROM node:24-bookworm-slim AS build
 WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-
-# Install dependencies
-RUN npm ci --only=production
-
-# Copy TypeScript config and source code
-COPY tsconfig.json ./
-COPY src/ ./src/
-
-# Install dev dependencies for building
+COPY package*.json .npmrc ./
 RUN npm ci
+COPY tsconfig.json ./
+COPY aspire-icon.svg ./
+COPY src/ ./src/
+RUN npm run build && npm prune --omit=dev
 
-# Build the TypeScript code
-RUN npm run build
-
-# Remove dev dependencies to reduce image size
-RUN npm ci --only=production && npm cache clean --force
-
-# Expose the port the app runs on
+FROM node:24-bookworm-slim
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build --chown=node:node /app/package*.json ./
+COPY --from=build --chown=node:node /app/node_modules ./node_modules
+COPY --from=build --chown=node:node /app/dist ./dist
+COPY --from=build --chown=node:node /app/aspire-icon.svg ./
+USER node
 EXPOSE 3000
-
-# Start the application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
